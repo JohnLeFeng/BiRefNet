@@ -19,7 +19,10 @@ def custom_sigmoid(output: Output):
     return ops.sigmoid(output)
 
 def main():
+    # Please download model from: https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx
     ov_model_path = Path("./ov_model/FP16/BiRefNet-general-bb_swin_v1_tiny.xml")
+    
+    # Please download image from: https://hips.hearstapps.com/hmg-prod/images/gettyimages-1229892983-square.jpg
     image_path = Path("test_image/gettyimages-1229892983-square.jpg")
 
     image = Image.open(image_path)
