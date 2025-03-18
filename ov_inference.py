@@ -44,9 +44,9 @@ def main():
 
         ov_model = prep.build()
         ov.save_model(ov_model, ov_model_path)
-        compiled_model = core.compile_model(ov_model, "GPU")
+        compiled_model = core.compile_model(ov_model, "CPU")
     else:
-        compiled_model = core.compile_model(ov_model_path, "GPU")
+        compiled_model = core.compile_model(ov_model_path, "CPU")
     
     pred = compiled_model(np.expand_dims(np.transpose(np.array(image.resize((1024, 1024))), (2, 0, 1)), 0))[0]
 
