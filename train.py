@@ -27,6 +27,8 @@ parser.add_argument('--dist', default=False, type=lambda x: x == 'True')
 parser.add_argument('--use_accelerate', action='store_true', help='`accelerate launch --multi_gpu train.py --use_accelerate`. Use accelerate for training, good for FP16/BF16/...')
 args = parser.parse_args()
 
+config = Config()
+
 if args.use_accelerate:
     from accelerate import Accelerator, utils
     mixed_precision = ['no', 'fp16', 'bf16', 'fp8'][1]
@@ -40,10 +42,6 @@ if args.use_accelerate:
     )
     args.dist = False
 
-config = Config()
-if config.rand_seed:
-    set_seed(config.rand_seed)
-
 # DDP
 to_be_distributed = args.dist
 if to_be_distributed:
@@ -51,9 +49,12 @@ if to_be_distributed:
     device = int(os.environ["LOCAL_RANK"])
 else:
     if args.use_accelerate:
-        device = accelerator.device
+        device = accelerator.local_process_index
     else:
         device = config.device
+
+if config.rand_seed:
+    set_seed(config.rand_seed + device)
 
 epoch_st = 1
 # make dir for ckpt
@@ -78,19 +79,19 @@ def prepare_dataloader(dataset: torch.utils.data.Dataset, batch_size: int, to_be
     if to_be_distributed:
         return torch.utils.data.DataLoader(
             dataset=dataset, batch_size=batch_size, num_workers=min(config.num_workers, batch_size), pin_memory=True,
-            shuffle=False, sampler=DistributedSampler(dataset), drop_last=True, collate_fn=custom_collate_fn if is_train else None
+            shuffle=False, sampler=DistributedSampler(dataset), drop_last=True, collate_fn=custom_collate_fn if is_train and config.dynamic_size else None
         )
     else:
         return torch.utils.data.DataLoader(
             dataset=dataset, batch_size=batch_size, num_workers=min(config.num_workers, batch_size), pin_memory=True,
-            shuffle=is_train, sampler=None, drop_last=True, collate_fn=custom_collate_fn if is_train else None
+            shuffle=is_train, sampler=None, drop_last=True, collate_fn=custom_collate_fn if is_train and config.dynamic_size else None
         )
 
 
 def init_data_loaders(to_be_distributed):
     # Prepare datasets
     train_loader = prepare_dataloader(
-        MyData(datasets=config.training_set, image_size=config.size, is_train=True),
+        MyData(datasets=config.training_set, data_size=None if config.dynamic_size else config.size, is_train=True),
         config.batch_size, to_be_distributed=to_be_distributed, is_train=True
     )
     print(len(train_loader), "batches of train dataloader {} have been created.".format(config.training_set))
@@ -216,7 +217,7 @@ class Trainer:
             # with nullcontext if not args.use_accelerate or accelerator.gradient_accumulation_steps <= 1 else accelerator.accumulate(self.model):
             self._train_batch(batch)
             # Logger
-            if batch_idx % 20 == 0:
+            if (epoch < 2 and batch_idx < 100 and batch_idx % 20 == 0) or batch_idx % max(100, len(self.train_loader) / 100 // 100 * 100) == 0:
                 info_progress = 'Epoch[{0}/{1}] Iter[{2}/{3}].'.format(epoch, args.epochs, batch_idx, len(self.train_loader))
                 info_loss = 'Training Losses'
                 for loss_name, loss_value in self.loss_dict.items():
