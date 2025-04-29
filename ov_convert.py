@@ -52,10 +52,13 @@ if __name__ == "__main__":
     # 
     birefnet = BiRefNet(bb_pretrained=False)
     # Please download model from:https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-general-bb_swin_v1_tiny-epoch_232.pth
-    state_dict = torch.load('torch_model/BiRefNet-general-bb_swin_v1_tiny-epoch_232.pth', map_location='cpu', weights_only=True)
+    # state_dict = torch.load('torch_model/BiRefNet-general-bb_swin_v1_tiny-epoch_232.pth', map_location='cpu', weights_only=True)
     # birefnet = BiRefNet(bb_pretrained=False, bb='swin_v1_l')
     # Please download model from:https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-general-resolution_512x512-fp16-epoch_216.pth
     # state_dict = torch.load('torch_model/BiRefNet-general-resolution_512x512-fp16-epoch_216.pth', map_location='cpu', weights_only=True)
+    # Please download model from:https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet_lite-matting-epoch_110.pth
+    state_dict = torch.load('torch_model/BiRefNet_lite-matting-epoch_110.pth', map_location='cpu', weights_only=True)
+
     state_dict = check_state_dict(state_dict)
     birefnet.load_state_dict(state_dict)
 
@@ -74,7 +77,8 @@ if __name__ == "__main__":
     ])
 
     # image_path = Path("test_image/gettyimages-1229892983-square.jpg")
-    image_path = Path("test_image/Joelan.jpg")
+    # image_path = Path("test_image/Joelan.jpg")
+    image_path = Path("test_image/Joelan_2.jpg")
     image = Image.open(image_path)
     image = image.convert("RGB") if image.mode != "RGB" else image
 
@@ -85,12 +89,14 @@ if __name__ == "__main__":
 
     # # Show Results
     pred_pil = transforms.ToPILImage()(pred)
-    pred_pil.resize(image.size).save("torch_mask/torch_Joelan_mask_result_" + str(WIDTH) + "x" + str(HEIGHT) + ".jpg")
+    # pred_pil.resize(image.size).save("torch_mask/torch_Joelan_mask_result_" + str(WIDTH) + "x" + str(HEIGHT) + ".jpg")
+    pred_pil.resize(image.size).save("torch_mask/torch_Joelan_2_mask_result_" + str(WIDTH) + "x" + str(HEIGHT) + ".jpg")
 
     # convert
     core = ov.Core()
-    ov_model_path = Path("ov_model/FP16/BiRefNet-general-bb_swin_v1_tiny_from_torch_" + str(WIDTH) + "x" + str(HEIGHT) + ".xml")
+    # ov_model_path = Path("ov_model/FP16/BiRefNet-general-bb_swin_v1_tiny_from_torch_" + str(WIDTH) + "x" + str(HEIGHT) + ".xml")
     # ov_model_path = Path("ov_model/FP16/BiRefNet-general-resolution_512x512_from_torch_" + str(WIDTH) + "x" + str(HEIGHT) + ".xml")
+    ov_model_path = Path("ov_model/FP16/BBiRefNet_lite-matting_from_torch_" + str(WIDTH) + "x" + str(HEIGHT) + ".xml")
     if not os.path.exists(ov_model_path):
         input_images = transform_image(image).unsqueeze(0).to(device)
         example_input = input_images
@@ -111,8 +117,10 @@ if __name__ == "__main__":
     #Infer
     pred = compiled_model(np.expand_dims(np.transpose(np.array(image.resize((WIDTH, HEIGHT))), (2, 0, 1)), 0))[0]
     pred_pil = Image.fromarray((pred[0][0] * 255).astype(np.uint8), mode='L')
-    pred_pil.resize(image.size).save("ov_mask/ov_Joelan_mask_result_" + str(WIDTH) + "x" + str(HEIGHT) + ".jpg")
+    # pred_pil.resize(image.size).save("ov_mask/ov_Joelan_mask_result_lite-matting_" + str(WIDTH) + "x" + str(HEIGHT) + ".jpg")
+    pred_pil.resize(image.size).save("ov_mask/ov_Joelan_2_mask_result_lite-matting_" + str(WIDTH) + "x" + str(HEIGHT) + ".jpg")
 
     image_masked = refine_foreground(image, pred_pil)
     image_masked.putalpha(pred_pil.resize(image.size))
-    image_masked.save("output_image\ov_Joelan_result_" + str(WIDTH) + "x" + str(HEIGHT) + ".png")
+    # image_masked.save("output_image\ov_Joelan_result_lite-matting_" + str(WIDTH) + "x" + str(HEIGHT) + ".png")
+    image_masked.save("output_image\ov_Joelan_2_result_lite-matting_" + str(WIDTH) + "x" + str(HEIGHT) + ".png")
